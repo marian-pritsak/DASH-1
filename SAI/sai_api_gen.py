@@ -10,28 +10,17 @@ except ImportError as ie:
     print("Import failed for " + ie.name)
     exit(1)
 
-PIPELINES_TAG = 'pipelines'
 NAME_TAG = 'name'
-INGRESS_PIPE = 'ingress'
 TABLES_TAG = 'tables'
-KEY_TAG = 'key'
-
-def get_ingress_pipeline(json_program):
-    for pipe in json_program[PIPELINES_TAG]:
-        if pipe[NAME_TAG] == INGRESS_PIPE:
-            return pipe
-
-    return None
-
-
-def get_tables(ingress_pipeline):
-    tables = []
-    for table in ingress_pipeline[TABLES_TAG]:
-        if len(table[KEY_TAG]) > 0:
-            tables.append(table)
-    
-    return tables
-
+BITWIDTH_TAG = 'bitwidth'
+ACTIONS_TAG = 'actions'
+PREAMBLE_TAG = 'preamble'
+OTHER_MATCH_TYPE_TAG = 'otherMatchType'
+MATCH_TYPE_TAG = 'matchType'
+PARAMS_TAG = 'params'
+ACTION_REFS_TAG = 'actionRefs'
+MATCH_FIELDS_TAG = 'matchFields'
+NOACTION = 'NoAction'
 
 def get_sai_key_type(key_size, key_header, key_field):
     if key_size == 1:
@@ -81,7 +70,7 @@ def get_sai_range_list_type(key_size, key_header, key_field):
         return 'sai_u64_range_list_t'
 
 
-def get_sai_key_data(program, key):
+def get_sai_key_data(key):
     sai_key_data = dict()
     full_key_name, sai_key_name = key[NAME_TAG].split(':')
     key_tuple = full_key_name.split('.')
@@ -91,19 +80,13 @@ def get_sai_key_data(program, key):
         key_header, key_field = key_tuple
     sai_key_data['sai_key_name'] = sai_key_name
 
-    key_header_type = None
-    for header in program['headers']:
-        if header['name'] == key_header:
-            key_header_type = header['header_type']
+    key_size = key[BITWIDTH_TAG]
+    
+    if OTHER_MATCH_TYPE_TAG in key:
+        sai_key_data['match_type'] =  key[OTHER_MATCH_TYPE_TAG].lower()
+    elif MATCH_TYPE_TAG in key:
+        sai_key_data['match_type'] =  key[MATCH_TYPE_TAG].lower()
 
-    key_size = 0
-    for header_type in program['header_types']:
-        if header_type['name'] == key_header_type:
-            for field in header_type['fields']:
-                if field[0] == key_field:
-                    key_size = int(field[1])
-
-    sai_key_data['match_type'] =  key['match_type']
     if sai_key_data['match_type'] == 'exact':
         sai_key_data['sai_key_type'] = get_sai_key_type(key_size, key_header, key_field)
     elif sai_key_data['match_type'] == 'lpm':
@@ -116,43 +99,47 @@ def get_sai_key_data(program, key):
     return sai_key_data
 
 
-def get_sai_action_data(program, action_name):
-    sai_action_data = dict()
-    sai_action_data['name'] = action_name.split('.')[-1]
-    params = []
-
-    for action in program['actions']:
-        if action['name'] == action_name:
-            for rdata in action['runtime_data']:
+def extract_action_data(program):
+    action_data = {}
+    for action in program[ACTIONS_TAG]:
+        #print(action)
+        preable = action[PREAMBLE_TAG]
+        id = preable['id']
+        name = preable[NAME_TAG].split('.')[-1]
+        params = []
+        if PARAMS_TAG in action:
+            for p in action[PARAMS_TAG]:
                 param = dict()
-                param['name'] = rdata['name']
-                param['type'] = get_sai_key_type(int(rdata['bitwidth']), param['name'], param['name'])
+                param['id'] = p['id']
+                param[NAME_TAG] = p[NAME_TAG]
+                param['type'] = get_sai_key_type(int(p[BITWIDTH_TAG]), p[NAME_TAG], p[NAME_TAG])
                 params.append(param)
-
-    sai_action_data['params'] = params
-    return sai_action_data
+        action_data[id] = {'id': id, NAME_TAG: name, PARAMS_TAG: params}
+    return action_data
 
 
 def generate_sai_api(program, ignore_tables):
     sai_api = dict()
-    tables = get_tables(get_ingress_pipeline(program))
+    all_actions = extract_action_data(program)
+    tables = program[TABLES_TAG]
     sai_tables = []
     for table in tables:
         sai_table_data = dict()
         sai_table_data['keys'] = []
-        sai_table_data['actions'] = []
-        table_control, table_name = table[NAME_TAG].split('.', 1)
-        sai_table_data['name'] = table_name.replace('.' , '_')
+        sai_table_data[ACTIONS_TAG] = []
+        table_control, table_name = table[PREAMBLE_TAG][NAME_TAG].split('.', 1)
+        sai_table_data[NAME_TAG] = table_name.replace('.' , '_')
 
-        if sai_table_data['name'] in ignore_tables:
+        if sai_table_data[NAME_TAG] in ignore_tables:
             continue
 
-        for key in table[KEY_TAG]:
-            sai_table_data['keys'].append(get_sai_key_data(program, key))
+        for key in table[MATCH_FIELDS_TAG]:
+            sai_table_data['keys'].append(get_sai_key_data(key))
 
-        for action in table['actions']:
-            if action != 'NoAction':
-                sai_table_data['actions'].append(get_sai_action_data(program, action))
+        for action in table[ACTION_REFS_TAG]:
+            action_id = action["id"]
+            if all_actions[action_id][NAME_TAG] != NOACTION:
+                sai_table_data[ACTIONS_TAG].append(all_actions[action_id])
 
         if len(sai_table_data['keys']) == 1 and sai_table_data['keys'][0]['sai_key_name'] == (table_name.split('.')[-1] + '_id'):
             sai_table_data['is_object'] = 'true'
@@ -162,11 +149,11 @@ def generate_sai_api(program, ignore_tables):
             sai_table_data['is_object'] = 'true'
         else:
             sai_table_data['is_object'] = 'false'
-            sai_table_data['name'] = sai_table_data['name'] + '_entry'
+            sai_table_data[NAME_TAG] = sai_table_data[NAME_TAG] + '_entry'
 
         sai_tables.append(sai_table_data)
 
-    sai_api['tables'] = sai_tables
+    sai_api[TABLES_TAG] = sai_tables
     return sai_api
 
 
@@ -207,8 +194,8 @@ def write_sai_files(sai_api):
     new_lines = []
     for line in lines:
         if 'Add new experimental object types above this line' in line:
-            for table in sai_api['tables']:
-                new_lines.append('    SAI_OBJECT_TYPE_' + table['name'].upper() + ',\n\n')
+            for table in sai_api[TABLES_TAG]:
+                new_lines.append('    SAI_OBJECT_TYPE_' + table[NAME_TAG].upper() + ',\n\n')
 
         new_lines.append(line)
 
@@ -222,10 +209,10 @@ def write_sai_files(sai_api):
     new_lines = []
     for line in lines:
         if 'Add new experimental entries above this line' in line:
-            for table in sai_api['tables']:
+            for table in sai_api[TABLES_TAG]:
                 if table['is_object'] == 'false':
-                    new_lines.append('    /** @validonly object_type == SAI_OBJECT_TYPE_' + table['name'].upper() + ' */\n')
-                    new_lines.append('    sai_' + table['name'] + '_t ' + table['name'] + ';\n\n')
+                    new_lines.append('    /** @validonly object_type == SAI_OBJECT_TYPE_' + table[NAME_TAG].upper() + ' */\n')
+                    new_lines.append('    sai_' + table[NAME_TAG] + '_t ' + table[NAME_TAG] + ';\n\n')
         if 'new experimental object type includes' in line:
             new_lines.append(line)
             new_lines.append('#include "../experimental/saiexperimental' + sai_api['app_name'] + '.h"\n')
@@ -240,7 +227,7 @@ def write_sai_files(sai_api):
 
 # CLI
 parser = argparse.ArgumentParser(description='P4 SAI API generator')
-parser.add_argument('filepath', type=str, help='Path to P4 program BMV2 JSON file')
+parser.add_argument('filepath', type=str, help='Path to P4 program RUNTIME JSON file')
 parser.add_argument('apiname', type=str, help='Name of the new SAI API')
 parser.add_argument('--print-sai-lib', type=bool)
 parser.add_argument('--sai-git-url', type=str, default='https://github.com/Opencomputeproject/SAI')
@@ -252,10 +239,10 @@ if not os.path.isfile(args.filepath):
     print('File ' + args.filepath + ' does not exist')
     exit(1)
 
-
 if os.path.exists('./SAI'):
     print('Directory ./SAI already exists. Please remove in order to proceed')
     exit(1)
+
 
 # Get SAI dictionary from P4 dictionary
 print("Generating SAI API...")
