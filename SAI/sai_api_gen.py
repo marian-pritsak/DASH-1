@@ -37,11 +37,14 @@ def get_sai_key_type(key_size, key_header, key_field):
         return 'sai_mac_t'
     elif key_size <= 64:
         return 'sai_uint64_t'
+    else:
+        raise ValueError(f'key_size={key_size} is not supported')
 
 
 def get_sai_lpm_type(key_size, key_header, key_field):
     if key_size == 32 and ('addr' in key_field or 'ip' in key_header):
         return 'sai_ip_prefix_t'
+    raise ValueError(f'key_size={key_size}, key_header={key_header}, and key_field={key_field} is not supported')
 
 
 def get_sai_list_type(key_size, key_header, key_field):
@@ -55,6 +58,7 @@ def get_sai_list_type(key_size, key_header, key_field):
         return 'sai_u32_list_t'
     elif key_size <= 64:
         return 'sai_u64_list_t'
+    raise ValueError(f'key_size={key_size} is not supported')
 
 
 def get_sai_range_list_type(key_size, key_header, key_field):
@@ -68,6 +72,7 @@ def get_sai_range_list_type(key_size, key_header, key_field):
         return 'sai_u32_range_list_t'
     elif key_size <= 64:
         return 'sai_u64_range_list_t'
+    raise ValueError(f'key_size={key_size} is not supported')
 
 
 def get_sai_key_data(key):
@@ -86,6 +91,8 @@ def get_sai_key_data(key):
         sai_key_data['match_type'] =  key[OTHER_MATCH_TYPE_TAG].lower()
     elif MATCH_TYPE_TAG in key:
         sai_key_data['match_type'] =  key[MATCH_TYPE_TAG].lower()
+    else:
+        raise ValueError(f'No valid match tag found')
 
     if sai_key_data['match_type'] == 'exact':
         sai_key_data['sai_key_type'] = get_sai_key_type(key_size, key_header, key_field)
@@ -95,6 +102,8 @@ def get_sai_key_data(key):
         sai_key_data['sai_list_type'] = get_sai_list_type(key_size, key_header, key_field)
     elif sai_key_data['match_type'] == 'range_list':
         sai_key_data['sai_range_list_type'] = get_sai_range_list_type(key_size, key_header, key_field)
+    else:
+        raise ValueError(f"match_type={sai_key_data['match_type']} is not supported")
 
     return sai_key_data
 
