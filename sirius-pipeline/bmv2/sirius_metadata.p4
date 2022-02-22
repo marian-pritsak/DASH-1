@@ -13,10 +13,10 @@ struct encap_data_t {
     EthernetAddress overlay_dmac;
 }
 
-enum direction_t {
-    INVALID,
-    OUTBOUND,
-    INBOUND
+enum bit<16> direction_t {
+    INVALID = 0,
+    OUTBOUND = 1,
+    INBOUND = 2
 }
 
 struct conntrack_data_t {
