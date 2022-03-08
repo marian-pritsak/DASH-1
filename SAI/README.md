@@ -3,6 +3,8 @@ usage: sai_api_gen.py [-h] [--print-sai-lib PRINT_SAI_LIB]
                       [--sai-git-url SAI_GIT_URL]
                       [--ignore-tables IGNORE_TABLES]
                       [--sai-git-branch SAI_GIT_BRANCH]
+		      [--overwrite=<True/False>]
+		      --impl_filepath=<output implemenation CPP file>
                       filepath apiname
 
 P4 SAI API generator
@@ -27,6 +29,7 @@ Example:
         --ignore-tables=appliance,eni_meter,slb_decap \
         --sai-git-url=https://github.com/marian-pritsak/SAI.git \
         --sai-git-branch=base \
+	--impl_filepath=./impl.cpp \
         dash
 ```
 

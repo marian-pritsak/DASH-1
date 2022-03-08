@@ -24,59 +24,61 @@ NOACTION = 'NoAction'
 
 def get_sai_key_type(key_size, key_header, key_field):
     if key_size == 1:
-        return 'bool'
+        return 'bool', "booldata"
     elif key_size <= 8:
-        return 'sai_uint8_t'
+        return 'sai_uint8_t', "u8"
     elif key_size <= 16:
-        return 'sai_uint16_t'
+        return 'sai_uint16_t', "u16"
     elif key_size == 32 and ('addr' in key_field or 'ip' in key_header):
-        return 'sai_ip_address_t'
+        return 'sai_ip_address_t', "ipaddr"
     elif key_size <= 32:
-        return 'sai_uint32_t'
+        return 'sai_uint32_t', "u32"
     elif key_size == 48 and ('addr' in key_field or 'mac' in key_header):
-        return 'sai_mac_t'
+        return 'sai_mac_t', "mac"
     elif key_size <= 64:
-        return 'sai_uint64_t'
+        return 'sai_uint64_t', "u64"
     else:
         raise ValueError(f'key_size={key_size} is not supported')
 
 
 def get_sai_lpm_type(key_size, key_header, key_field):
     if key_size == 32 and ('addr' in key_field or 'ip' in key_header):
-        return 'sai_ip_prefix_t'
+        return 'sai_ip_prefix_t', 'ipPrefix'
     raise ValueError(f'key_size={key_size}, key_header={key_header}, and key_field={key_field} is not supported')
 
 
 def get_sai_list_type(key_size, key_header, key_field):
     if key_size <= 8:
-        return 'sai_u8_list_t'
+        return 'sai_u8_list_t', "u8list"
     elif key_size <= 16:
-        return 'sai_u16_list_t'
+        return 'sai_u16_list_t', "u16list"
     elif key_size == 32 and ('addr' in key_field or 'ip' in key_header):
-        return 'sai_ip_address_list_t'
+        return 'sai_ip_address_list_t', "ipaddrlist"
     elif key_size <= 32:
-        return 'sai_u32_list_t'
+        return 'sai_u32_list_t', "u32list"
     elif key_size <= 64:
-        return 'sai_u64_list_t'
+        ValueError(f'sai_u64_list_t is not supported')
+        return 'sai_u64_list_t', "no mapping"
     raise ValueError(f'key_size={key_size} is not supported')
 
 
 def get_sai_range_list_type(key_size, key_header, key_field):
     if key_size <= 8:
-        return 'sai_u8_range_list_t'
+        return 'sai_u8_range_list_t', 'u8rangelist'
     elif key_size <= 16:
-        return 'sai_u16_range_list_t'
+        return 'sai_u16_range_list_t', 'u16rangelist'
     elif key_size == 32 and ('addr' in key_field or 'ip' in key_header):
-        return 'sai_ipaddr_range_list_t'
+        return 'sai_ipaddr_range_list_t', 'ipaddrrangelist'
     elif key_size <= 32:
-        return 'sai_u32_range_list_t'
+        return 'sai_u32_range_list_t',  'u32rangelist'
     elif key_size <= 64:
-        return 'sai_u64_range_list_t'
+        return 'sai_u64_range_list_t',  'u64rangelist'
     raise ValueError(f'key_size={key_size} is not supported')
 
 
 def get_sai_key_data(key):
     sai_key_data = dict()
+    sai_key_data['id'] =  key['id']
     full_key_name, sai_key_name = key[NAME_TAG].split(':')
     key_tuple = full_key_name.split('.')
     if len(key_tuple) == 3:
@@ -95,13 +97,13 @@ def get_sai_key_data(key):
         raise ValueError(f'No valid match tag found')
 
     if sai_key_data['match_type'] == 'exact':
-        sai_key_data['sai_key_type'] = get_sai_key_type(key_size, key_header, key_field)
+        sai_key_data['sai_key_type'], sai_key_data['sai_key_field'] = get_sai_key_type(key_size, key_header, key_field)
     elif sai_key_data['match_type'] == 'lpm':
-        sai_key_data['sai_lpm_type'] = get_sai_lpm_type(key_size, key_header, key_field)
+        sai_key_data['sai_lpm_type'], sai_key_data['sai_lpm_field'] = get_sai_lpm_type(key_size, key_header, key_field)
     elif sai_key_data['match_type'] == 'list':
-        sai_key_data['sai_list_type'] = get_sai_list_type(key_size, key_header, key_field)
+        sai_key_data['sai_list_type'], sai_key_data['sai_list_field']  = get_sai_list_type(key_size, key_header, key_field)
     elif sai_key_data['match_type'] == 'range_list':
-        sai_key_data['sai_range_list_type'] = get_sai_range_list_type(key_size, key_header, key_field)
+        sai_key_data['sai_range_list_type'], sai_key_data['sai_range_list_field'] = get_sai_range_list_type(key_size, key_header, key_field)
     else:
         raise ValueError(f"match_type={sai_key_data['match_type']} is not supported")
 
@@ -121,7 +123,7 @@ def extract_action_data(program):
                 param = dict()
                 param['id'] = p['id']
                 param[NAME_TAG] = p[NAME_TAG]
-                param['type'] = get_sai_key_type(int(p[BITWIDTH_TAG]), p[NAME_TAG], p[NAME_TAG])
+                param['type'], param['field'] = get_sai_key_type(int(p[BITWIDTH_TAG]), p[NAME_TAG], p[NAME_TAG])
                 params.append(param)
         action_data[id] = {'id': id, NAME_TAG: name, PARAMS_TAG: params}
     return action_data
@@ -138,6 +140,7 @@ def generate_sai_api(program, ignore_tables):
         sai_table_data[ACTIONS_TAG] = []
         table_control, table_name = table[PREAMBLE_TAG][NAME_TAG].split('.', 1)
         sai_table_data[NAME_TAG] = table_name.replace('.' , '_')
+        sai_table_data['id'] =  table[PREAMBLE_TAG]['id']
 
         if sai_table_data[NAME_TAG] in ignore_tables:
             continue
@@ -164,6 +167,14 @@ def generate_sai_api(program, ignore_tables):
 
     sai_api[TABLES_TAG] = sai_tables
     return sai_api
+
+def write_sai_impl_files(sai_api):
+    env = Environment(loader=FileSystemLoader('.'), trim_blocks=True, lstrip_blocks=True)
+    sai_impl_tm = env.get_template('saiapi.cpp.j2')
+    sai_impl_str = sai_impl_tm.render(tables = sai_api[TABLES_TAG])
+
+    with open(args.impl_filepath, 'w') as o:
+        o.write(sai_impl_str)
 
 
 def write_sai_files(sai_api):
@@ -242,16 +253,21 @@ parser.add_argument('--print-sai-lib', type=bool)
 parser.add_argument('--sai-git-url', type=str, default='https://github.com/Opencomputeproject/SAI')
 parser.add_argument('--ignore-tables', type=str, default='', help='Comma separated list of tables to ignore')
 parser.add_argument('--sai-git-branch', type=str, default='master')
+parser.add_argument('--overwrite',  type=bool, default=False, help='Overwrite the existing SAI repo')
+parser.add_argument('--impl_filepath', type=str, required=True, help='File path where to produce the implementation CPP file.')
 args = parser.parse_args()
 
 if not os.path.isfile(args.filepath):
     print('File ' + args.filepath + ' does not exist')
     exit(1)
 
-if os.path.exists('./SAI'):
+if args.overwrite == False and os.path.exists('./SAI'):
     print('Directory ./SAI already exists. Please remove in order to proceed')
     exit(1)
 
+if os.path.dirname(args.impl_filepath) != "" and os.path.isdir(os.path.dirname(args.impl_filepath)) == False:
+    print('Directory ' + os.path.dirname(args.impl_filepath) + ' does not exist. Please create it.')
+    exit(1)
 
 # Get SAI dictionary from P4 dictionary
 print("Generating SAI API...")
@@ -268,5 +284,6 @@ Repo.clone_from(args.sai_git_url, './SAI', branch=args.sai_git_branch)
 # Write SAI dictionary into SAI API headers
 write_sai_files(sai_api)
 
+write_sai_impl_files(sai_api)
 if args.print_sai_lib:
     print(json.dumps(sai_api, indent=2))
