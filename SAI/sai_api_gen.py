@@ -171,7 +171,7 @@ def generate_sai_api(program, ignore_tables):
 def write_sai_impl_files(sai_api):
     env = Environment(loader=FileSystemLoader('.'), trim_blocks=True, lstrip_blocks=True)
     sai_impl_tm = env.get_template('saiapi.cpp.j2')
-    sai_impl_str = sai_impl_tm.render(tables = sai_api[TABLES_TAG])
+    sai_impl_str = sai_impl_tm.render(tables = sai_api[TABLES_TAG], app_name = sai_api['app_name'])
 
     with open(args.impl_filepath, 'w') as o:
         o.write(sai_impl_str)

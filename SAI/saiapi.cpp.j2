@@ -604,3 +604,12 @@ sai_status_t sai_get_{{ table.name }}_attribute(
 }
 {% endif %}
 {% endfor %}
+
+static sai_{{ app_name }}_api_t sai_{{app_name }}_api_impl = {
+{% for table in tables %}
+    .create_{{ table.name }} =  sai_create_{{ table.name }},
+    .remove_{{ table.name }} = sai_remove_{{ table.name }},
+    .set_{{ table.name }}_attribute = sai_set_{{ table.name }}_attribute,
+    .get_{{ table.name }}_attribute = sai_get_{{ table.name }}_attribute,
+{% endfor %}
+};
