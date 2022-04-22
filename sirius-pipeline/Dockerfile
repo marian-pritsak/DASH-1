@@ -39,17 +39,83 @@ RUN apt-get update && apt-get install -y lsb-release
 
 RUN pip3 install ipaddr
 
+RUN apt-get install -y libreadline-dev libnanomsg-dev
+
 RUN git clone https://github.com/marian-pritsak/behavioral-model && \
         cd behavioral-model && \
 	bash install_deps.sh && \
         ./autogen.sh && \
-        ./configure && \
+        ./configure --with-thrift && \
         make && \
         make install && \
         cd .. && \
         rm -rf behavioral-model
+# Build gRPC.
+# The gRPC build system should detect that a version of protobuf is already
+# installed and should not try to install the third-party one included as a
+# submodule in the grpc repository.
+ENV GRPC_DEPS build-essential \
+              autoconf \
+              libtool
+RUN git clone https://github.com/google/grpc.git
+WORKDIR /grpc/
+RUN git checkout tags/v1.3.2 && \
+    git submodule update --init --recursive
 
-ENV LD_LIBRARY_PATH /usr/local/lib/
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends $GRPC_DEPS libgflags-dev && \
+    export LDFLAGS="-Wl,-s" && \
+    make && \
+    make grpc_cli && \
+    make install && \
+    ldconfig && \
+    cp /grpc/bins/opt/grpc_cli /usr/bin/ && \
+    apt-get purge -y $GRPC_DEPS && apt-get autoremove --purge -y && \
+    rm -rf /grpc /var/cache/apt/* /var/lib/apt/lists/* /var/cache/debconf/* /var/lib/dpkg/*-old /var/log/*
+
+WORKDIR /
+
+ENV BM_DEPS automake \
+            build-essential \
+            libjudy-dev \
+            libgmp-dev \
+            libpcap-dev \
+            libboost-dev \
+            libboost-program-options-dev \
+            libboost-system-dev \
+            libboost-filesystem-dev \
+            libboost-thread-dev \
+            libtool \
+            pkg-config
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends $BM_DEPS
+
+ADD https://api.github.com/repos/p4lang/PI/git/refs/heads/master .PI.head.json
+
+RUN git clone https://github.com/p4lang/PI/
+
+WORKDIR /PI
+
+RUN git submodule update --init --recursive
+
+RUN export CFLAGS="-O0" && \
+    export CXXFLAGS="-O0" && \
+    ./autogen.sh && \
+    ./configure --with-proto --without-cli --without-internal-rpc && \
+    make && \
+    make install && ldconfig && \
+    rm -rf /PI/
+
+RUN git clone https://github.com/marian-pritsak/behavioral-model && \
+        cd behavioral-model && \
+	bash install_deps.sh && \
+        ./autogen.sh && \
+        ./configure --with-pi --with-thrift && \
+        make && \
+        make install && \
+        cd .. && \
+        rm -rf behavioral-model
 
 ARG user
 ARG uid
