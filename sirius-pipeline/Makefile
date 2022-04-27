@@ -5,6 +5,7 @@ PWD := $(shell pwd)
 DOCKER_RUN := docker run \
 	-it \
 	--name simple_switch \
+	-v /builds2/marianp/dash-app:/dash-app \
 	-v $(PWD)/bmv2:/bmv2 \
 	-v $(PWD)/behavioral-model:/bm-src \
 	--network=host \
@@ -12,17 +13,26 @@ DOCKER_RUN := docker run \
 	bmv2-$(USER)
 
 bmv2/sirius_pipeline.bmv2/sirius_pipeline.json:
-	$(DOCKER_RUN) p4c -b bmv2 bmv2/sirius_pipeline.p4 -o bmv2/sirius_pipeline.bmv2
+	$(DOCKER_RUN) p4c -b bmv2 --p4runtime-files bmv2/sirius_pipeline.bmv2/sirius_pipeline_p4rt.json bmv2/sirius_pipeline.p4 -o bmv2/sirius_pipeline.bmv2 
 
 clean:
 	rm -rf bmv2/sirius_pipeline.bmv2
 
 run-switch:
-	$(DOCKER_RUN) simple_switch --log-console --interface 0@veth0 --interface 1@veth2 /bmv2/sirius_pipeline.bmv2/sirius_pipeline.json
+	$(DOCKER_RUN) sudo simple_switch_grpc --log-console --interface 0@veth0 --interface 1@veth2 /bmv2/sirius_pipeline.bmv2/sirius_pipeline.json
 
 docker:
 	docker build \
-	    --no-cache \
+	    -t bmv2-$(USER) \
+	    --build-arg user=$(USER) \
+	    --build-arg uid=$(shell id -u) \
+	    --build-arg guid=$(shell id -g) \
+	    --build-arg hostname=$(shell echo $$HOSTNAME) \
+	    .
+
+docker-bm:
+	docker build \
+	    -f Dockerfile.sai.bmv2 \
 	    -t bmv2-$(USER) \
 	    --build-arg user=$(USER) \
 	    --build-arg uid=$(shell id -u) \

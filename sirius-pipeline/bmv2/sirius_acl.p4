@@ -18,11 +18,11 @@ match_kind {
     table table_name { \
         key = { \
             meta.eni : exact @name("meta.eni:eni"); \
-            hdr.ipv4.dst_addr : list @name("hdr.ipv4.dst_addr:dip"); \
-            hdr.ipv4.src_addr : list @name("hdr.ipv4.src_addr:sip"); \
-            hdr.ipv4.protocol : list @name("hdr.ipv4.src_addr:protocol"); \
-            hdr.tcp.src_port : range_list @name("hdr.tcp.src_port:sport"); \
-            hdr.tcp.dst_port : range_list @name("hdr.tcp.dst_port:dport"); \
+            hdr.ipv4.dst_addr : exact @name("hdr.ipv4.dst_addr:dip"); \
+            hdr.ipv4.src_addr : exact @name("hdr.ipv4.src_addr:sip"); \
+            hdr.ipv4.protocol : exact @name("hdr.ipv4.src_addr:protocol"); \
+            hdr.tcp.src_port : exact @name("hdr.tcp.src_port:sport"); \
+            hdr.tcp.dst_port : exact @name("hdr.tcp.dst_port:dport"); \
         } \
         actions = { \
             permit; \
