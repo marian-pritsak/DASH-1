@@ -107,6 +107,7 @@ def get_sai_key_data(key):
     else:
         raise ValueError(f"match_type={sai_key_data['match_type']} is not supported")
 
+    sai_key_data['bitwidth'] = key_size
     return sai_key_data
 
 
@@ -124,6 +125,7 @@ def extract_action_data(program):
                 param['id'] = p['id']
                 param[NAME_TAG] = p[NAME_TAG]
                 param['type'], param['field'] = get_sai_key_type(int(p[BITWIDTH_TAG]), p[NAME_TAG], p[NAME_TAG])
+                param['bitwidth'] = p[BITWIDTH_TAG]
                 params.append(param)
         action_data[id] = {'id': id, NAME_TAG: name, PARAMS_TAG: params}
     return action_data
