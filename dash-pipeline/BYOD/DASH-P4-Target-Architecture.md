@@ -36,7 +36,7 @@ Complete list of native headers to be provided within the P4 TA document.
 ```p4
 control DASHMainControl<HEADERS, USER_META, PKT_OUT_META>(
         inout HEADERS headers,
-        in nv_standard_metadata_t std_meta,
+        in standard_metadata_t std_meta,
         inout USER_META user_meta,
         inout PKT_OUT_META pkt_out_meta);
 ```
@@ -60,7 +60,7 @@ Terminal extern function that stops packet processing and sends the packet to th
 Signature:
 
 ```p4
-extern void nv_send_to_port(in sai_object_id_t port);
+extern void dash_send_to_port(in sai_object_id_t port);
 ```
 
 Paramaters:
@@ -73,7 +73,7 @@ Terminal extern function that forwards packet metadata to a controller
 Signature:
 
 ```p4
-extern void nv_send_to_controller<PACKET_META>(in PACKET_META pkt_in_meta);
+extern void dash_send_to_controller<PACKET_META>(in PACKET_META pkt_in_meta);
 ```
 
 Paramaters:
