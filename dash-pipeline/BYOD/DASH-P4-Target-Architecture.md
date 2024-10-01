@@ -63,7 +63,7 @@ Signature:
 extern void dash_send_to_port(in sai_object_id_t port);
 ```
 
-Paramaters:
+Parameters:
 * `port[in]`: This parameter specifies the logical SAI port to which the packet will be sent to.
 
 `dash_send_to_controller`
@@ -76,7 +76,7 @@ Signature:
 extern void dash_send_to_controller<PACKET_META>(in PACKET_META pkt_in_meta);
 ```
 
-Paramaters:
+Parameters:
 * `pkt_in_meta[in]`: The metadata of the packet being sent to the controller for processing
 
 ## Examples
